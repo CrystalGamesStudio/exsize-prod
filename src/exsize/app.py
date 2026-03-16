@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from exsize.database import Base, engine
-from exsize.routers import auth, dashboard, family, settings
+from exsize.routers import auth, dashboard, family, settings, tasks
 
 # ensure models are imported so Base.metadata knows about them
 import exsize.models  # noqa: F401
@@ -20,3 +20,4 @@ app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(family.router)
 app.include_router(settings.router)
+app.include_router(tasks.router)
