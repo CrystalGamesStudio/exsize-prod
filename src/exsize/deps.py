@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from exsize.database import get_db
-from exsize.models import User
+from exsize.models import Subscription, User
 from exsize.security import decode_access_token
 
 bearer_scheme = HTTPBearer()
@@ -21,3 +21,12 @@ def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+def has_sizepass(family_id: int | None, db: Session) -> bool:
+    if family_id is None:
+        return False
+    return db.query(Subscription).filter(
+        Subscription.family_id == family_id,
+        Subscription.status == "active",
+    ).first() is not None

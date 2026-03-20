@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from exsize.database import get_db
-from exsize.deps import get_current_user
+from exsize.deps import get_current_user, has_sizepass
 from exsize.models import Task, Transaction, User
 from exsize.routers.gamification import compute_level
 
@@ -28,6 +28,7 @@ class TaskResponse(BaseModel):
     status: str
     assigned_to: int
     day_of_week: str | None = None
+    photo_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -133,8 +134,12 @@ def delete_task(task_id: int, user: User = Depends(get_current_user), db: Sessio
     db.commit()
 
 
+class TaskCompleteRequest(BaseModel):
+    photo_url: str | None = None
+
+
 @router.patch("/{task_id}/complete", response_model=TaskResponse)
-def complete_task(task_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def complete_task(task_id: int, body: TaskCompleteRequest | None = None, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user.role != "child":
         raise HTTPException(status_code=403, detail="Only children can complete tasks")
     task = _get_family_task(task_id, user, db)
@@ -142,6 +147,11 @@ def complete_task(task_id: int, user: User = Depends(get_current_user), db: Sess
         raise HTTPException(status_code=403, detail="Task not assigned to you")
     if task.status != "accepted":
         raise HTTPException(status_code=409, detail="Task is not in accepted state")
+    photo_url = body.photo_url if body else None
+    if photo_url:
+        if not has_sizepass(user.family_id, db):
+            raise HTTPException(status_code=403, detail="Photo attachments require SizePass. Upgrade to attach photos.")
+        task.photo_url = photo_url
     task.status = "completed"
     db.commit()
     db.refresh(task)

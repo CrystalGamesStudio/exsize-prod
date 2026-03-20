@@ -16,6 +16,7 @@ class Task(Base):
     family_id: Mapped[int] = mapped_column(Integer, ForeignKey("families.id"), nullable=False)
     created_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     day_of_week: Mapped[str | None] = mapped_column(String, nullable=True)
+    photo_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class Family(Base):
@@ -69,4 +70,15 @@ class Purchase(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     reward_id: Mapped[int] = mapped_column(Integer, ForeignKey("rewards.id"), nullable=False)
+    created_at: Mapped[str] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    family_id: Mapped[int] = mapped_column(Integer, ForeignKey("families.id"), unique=True, nullable=False)
+    plan: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active")
+    current_period_end: Mapped[str | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime, nullable=False, server_default=func.now())

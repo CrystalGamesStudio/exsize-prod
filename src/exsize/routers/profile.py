@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from exsize.database import get_db
-from exsize.deps import get_current_user
+from exsize.deps import get_current_user, has_sizepass
 from exsize.models import Transaction, User
 from exsize.routers.gamification import LEVEL_NAMES, progress_percent, xp_for_next_level
 
@@ -34,12 +34,28 @@ class ProfileResponse(BaseModel):
     transactions: list[TransactionItem]
 
 
+SIZEPASS_MILESTONE_BADGES = {
+    5: "Rising Star",
+    10: "SizePass Pro",
+    20: "SizePass Elite",
+    30: "SizePass Master",
+    40: "SizePass Hero",
+    50: "SizePass Legend",
+}
+
+
 def _build_profile(child: User, db: Session) -> ProfileResponse:
     txns = db.query(Transaction).filter(
         Transaction.user_id == child.id,
     ).order_by(Transaction.created_at.desc()).all()
 
-    badges = ["Freemium"]
+    if has_sizepass(child.family_id, db):
+        badges = ["SizePass"]
+        for level_threshold, badge_name in SIZEPASS_MILESTONE_BADGES.items():
+            if child.level >= level_threshold:
+                badges.append(badge_name)
+    else:
+        badges = ["Freemium"]
 
     return ProfileResponse(
         xp=child.xp,

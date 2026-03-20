@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from exsize.database import get_db
-from exsize.deps import get_current_user
+from exsize.deps import get_current_user, has_sizepass
 from exsize.models import Family, User
 
 router = APIRouter(prefix="/api/family", tags=["family"])
@@ -68,10 +68,11 @@ def join_family(body: JoinRequest, user: User = Depends(get_current_user), db: S
     if not family:
         raise HTTPException(status_code=404, detail="Invalid PIN")
     members = db.query(User).filter(User.family_id == family.id).all()
-    role_count = sum(1 for m in members if m.role == user.role)
-    limit = FREE_TIER_MAX_PARENTS if user.role == "parent" else FREE_TIER_MAX_CHILDREN
-    if role_count >= limit:
-        raise HTTPException(status_code=403, detail=f"Free tier limit reached: max {limit} {user.role}(s). Upgrade to add more.")
+    if not has_sizepass(family.id, db):
+        role_count = sum(1 for m in members if m.role == user.role)
+        limit = FREE_TIER_MAX_PARENTS if user.role == "parent" else FREE_TIER_MAX_CHILDREN
+        if role_count >= limit:
+            raise HTTPException(status_code=403, detail=f"Free tier limit reached: max {limit} {user.role}(s). Upgrade to SizePass to add more.")
     user.family_id = family.id
     db.commit()
     return JoinResponse(family_id=family.id)

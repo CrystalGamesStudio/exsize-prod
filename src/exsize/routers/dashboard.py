@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from exsize.database import get_db
-from exsize.deps import get_current_user
+from exsize.deps import get_current_user, has_sizepass
 from exsize.models import Task, Transaction, User
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
@@ -27,9 +27,25 @@ class DayChild(BaseModel):
     approved: int
 
 
+class AdvancedChildStats(BaseModel):
+    id: int
+    email: str
+    total_tasks: int
+    approved_tasks: int
+    xp: int
+    level: int
+
+
+class AdvancedStats(BaseModel):
+    total_xp_earned: int
+    best_streak: int
+    children: list[AdvancedChildStats]
+
+
 class DashboardResponse(BaseModel):
     children: list[ChildStats]
     weekly_overview: dict[str, list[DayChild]]
+    advanced_stats: AdvancedStats | None = None
 
 
 @router.get("/dashboard", response_model=DashboardResponse)
@@ -78,4 +94,29 @@ def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_
                     approved=sum(1 for t in day_tasks if t.status == "approved"),
                 ))
 
-    return DashboardResponse(children=child_stats, weekly_overview=weekly_overview)
+    advanced_stats = None
+    if has_sizepass(user.family_id, db):
+        total_xp = sum(c.xp for c in children)
+        best_streak = max((c.streak for c in children), default=0)
+        adv_children = []
+        for child in children:
+            child_tasks = [t for t in tasks if t.assigned_to == child.id]
+            adv_children.append(AdvancedChildStats(
+                id=child.id,
+                email=child.email,
+                total_tasks=len(child_tasks),
+                approved_tasks=sum(1 for t in child_tasks if t.status == "approved"),
+                xp=child.xp,
+                level=child.level,
+            ))
+        advanced_stats = AdvancedStats(
+            total_xp_earned=total_xp,
+            best_streak=best_streak,
+            children=adv_children,
+        )
+
+    return DashboardResponse(
+        children=child_stats,
+        weekly_overview=weekly_overview,
+        advanced_stats=advanced_stats,
+    )
