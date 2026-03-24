@@ -1,39 +1,73 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { describe, it, expect, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AuthProvider } from "@/auth";
 import AppLayout from "@/layouts/AppLayout";
 
 vi.mock("@/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api")>();
-  return { ...actual, setToken: vi.fn(), getMe: vi.fn() };
+  return { ...actual, setToken: vi.fn(), getMe: vi.fn(), getBalance: vi.fn() };
 });
 
-import { setToken as setTokenMock } from "@/api";
+import { setToken as setTokenMock, getBalance as getBalanceMock } from "@/api";
 import type { UserResponse } from "@/api";
 
 function renderLayoutWithUser(user: UserResponse) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
-    <AuthProvider>
-      <MemoryRouter initialEntries={["/dashboard"]}>
-        <Routes>
-          <Route
-            path="/dashboard"
-            element={
-              <AppLayout user={user}>
-                <div>Page Content</div>
-              </AppLayout>
-            }
-          />
-          <Route path="/login" element={<div>Login Page</div>} />
-        </Routes>
-      </MemoryRouter>
-    </AuthProvider>,
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/dashboard"]}>
+          <Routes>
+            <Route
+              path="/dashboard"
+              element={
+                <AppLayout user={user}>
+                  <div>Page Content</div>
+                </AppLayout>
+              }
+            />
+            <Route path="/login" element={<div>Login Page</div>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
+    </QueryClientProvider>,
   );
 }
 
 describe("AppLayout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows ExBucks balance in header for child", async () => {
+    vi.mocked(getBalanceMock).mockResolvedValue({ balance: 42 });
+    renderLayoutWithUser({
+      id: 2,
+      email: "child@test.com",
+      role: "child",
+      language: "en",
+    });
+    expect(await screen.findByText("42 ExBucks")).toBeInTheDocument();
+  });
+
+  it("does not show ExBucks balance for parent", async () => {
+    vi.mocked(getBalanceMock).mockResolvedValue({ balance: 0 });
+    renderLayoutWithUser({
+      id: 1,
+      email: "parent@test.com",
+      role: "parent",
+      language: "en",
+    });
+    // Wait for layout to render then check no balance shown
+    expect(await screen.findByText(/page content/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\d+ ExBucks/)).not.toBeInTheDocument();
+  });
+
   it("shows parent nav items for parent role", () => {
     renderLayoutWithUser({
       id: 1,

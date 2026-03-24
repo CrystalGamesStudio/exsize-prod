@@ -163,3 +163,44 @@ export function completeTask(taskId: number) {
     method: "PATCH",
   });
 }
+
+// --- ExBucks ---
+
+export interface BalanceResponse {
+  balance: number;
+}
+
+export interface TransactionResponse {
+  id: number;
+  type: string;
+  amount: number;
+  description: string;
+  created_at: string;
+}
+
+export interface PenaltyRequest {
+  child_id: number;
+  amount: number;
+  reason: string;
+}
+
+export function getBalance() {
+  return apiFetch<BalanceResponse>("/api/exbucks/balance");
+}
+
+export function getTransactions() {
+  return apiFetch<TransactionResponse[]>("/api/exbucks/transactions");
+}
+
+export function getChildTransactions(childId: number) {
+  return apiFetch<TransactionResponse[]>(
+    `/api/exbucks/transactions/${childId}`,
+  );
+}
+
+export function assignPenalty(data: PenaltyRequest) {
+  return apiFetch<TransactionResponse>("/api/exbucks/penalty", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}

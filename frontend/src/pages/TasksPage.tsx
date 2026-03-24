@@ -74,6 +74,9 @@ export default function TasksPage({ user }: TasksPageProps) {
     mutationFn: approveTask,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["exbucks-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["child-transactions"] });
     },
   });
 

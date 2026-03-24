@@ -1,8 +1,9 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { UserResponse } from "@/api";
+import { getBalance, type UserResponse } from "@/api";
 import { useAuth } from "@/auth";
 
 const NAV_ITEMS: Record<string, { label: string; to: string }[]> = {
@@ -10,11 +11,13 @@ const NAV_ITEMS: Record<string, { label: string; to: string }[]> = {
     { label: "Dashboard", to: "/dashboard" },
     { label: "Tasks", to: "/tasks" },
     { label: "Family", to: "/family" },
+    { label: "ExBucks", to: "/exbucks" },
     { label: "Settings", to: "/settings" },
   ],
   child: [
     { label: "Tasks", to: "/tasks" },
     { label: "Family", to: "/family" },
+    { label: "ExBucks", to: "/exbucks" },
     { label: "Shop", to: "/shop" },
     { label: "Profile", to: "/profile" },
     { label: "Settings", to: "/settings" },
@@ -23,6 +26,7 @@ const NAV_ITEMS: Record<string, { label: string; to: string }[]> = {
     { label: "Dashboard", to: "/dashboard" },
     { label: "Tasks", to: "/tasks" },
     { label: "Family", to: "/family" },
+    { label: "ExBucks", to: "/exbucks" },
     { label: "Rewards", to: "/rewards" },
     { label: "Settings", to: "/settings" },
   ],
@@ -61,6 +65,13 @@ export default function AppLayout({ user, children }: AppLayoutProps) {
   const [dark, toggleDark] = useDarkMode();
   const navItems = NAV_ITEMS[user.role] ?? NAV_ITEMS.parent;
 
+  const { data: balanceData } = useQuery({
+    queryKey: ["exbucks-balance"],
+    queryFn: getBalance,
+    retry: false,
+    enabled: user.role === "child",
+  });
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b bg-background">
@@ -77,6 +88,11 @@ export default function AppLayout({ user, children }: AppLayoutProps) {
             ))}
           </nav>
           <div className="flex items-center gap-2">
+            {user.role === "child" && balanceData != null && (
+              <span className="text-sm font-semibold">
+                {balanceData.balance} ExBucks
+              </span>
+            )}
             <Button
               variant="ghost"
               size="sm"
