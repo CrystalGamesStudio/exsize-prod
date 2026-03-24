@@ -111,6 +111,29 @@ describe("FamilyPage", () => {
     expect(writeText).toHaveBeenCalledWith("XYZ789");
   });
 
+  it("shows 'Copied!' feedback after copying PIN", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.mocked(getFamilyMock).mockResolvedValue({
+      id: 1,
+      pin: "XYZ789",
+      members: [{ id: 1, email: "parent@test.com", role: "parent" }],
+    });
+
+    renderFamilyPage("parent");
+
+    const copyBtn = await screen.findByRole("button", { name: /copy/i });
+    await user.click(copyBtn);
+
+    expect(await screen.findByRole("button", { name: /copied/i })).toBeInTheDocument();
+  });
+
   it("shows join family form when child has no family", async () => {
     vi.mocked(getFamilyMock).mockRejectedValue(new ApiError(404, "Not in a family"));
 
@@ -168,7 +191,50 @@ describe("FamilyPage", () => {
     expect(removeFamilyMemberMock).toHaveBeenCalledWith(2, expect.anything());
   });
 
-  it("shows upgrade prompt when free tier limit is reached", async () => {
+  it("full flow: parent creates family, child joins with PIN, parent sees child in members", async () => {
+    const user = userEvent.setup();
+
+    // Step 1: Parent has no family → creates one → sees PIN
+    vi.mocked(getFamilyMock).mockRejectedValue(new ApiError(404, "Not in a family"));
+    vi.mocked(createFamilyMock).mockResolvedValue({ id: 1, pin: "FAM999" });
+
+    const { unmount } = renderFamilyPage("parent");
+
+    await user.click(await screen.findByRole("button", { name: /create family/i }));
+    expect(await screen.findByText("FAM999")).toBeInTheDocument();
+    unmount();
+
+    // Step 2: Child joins with the PIN
+    vi.mocked(getFamilyMock).mockRejectedValue(new ApiError(404, "Not in a family"));
+    vi.mocked(joinFamilyMock).mockResolvedValue({ family_id: 1 });
+
+    const { unmount: unmountChild } = renderFamilyPage("child");
+
+    const pinInput = await screen.findByLabelText(/pin/i);
+    await user.type(pinInput, "FAM999");
+    await user.click(screen.getByRole("button", { name: /join family/i }));
+
+    expect(joinFamilyMock).toHaveBeenCalledWith("FAM999", expect.anything());
+    unmountChild();
+
+    // Step 3: Parent views family → sees child in members
+    vi.mocked(getFamilyMock).mockResolvedValue({
+      id: 1,
+      pin: "FAM999",
+      members: [
+        { id: 1, email: "parent@test.com", role: "parent" },
+        { id: 2, email: "child@test.com", role: "child" },
+      ],
+    });
+
+    renderFamilyPage("parent");
+
+    expect(await screen.findByText("parent@test.com")).toBeInTheDocument();
+    expect(screen.getByText("child@test.com")).toBeInTheDocument();
+    expect(screen.getByText("FAM999")).toBeInTheDocument();
+  });
+
+  it("shows styled upgrade prompt when free tier limit is reached", async () => {
     const user = userEvent.setup();
     vi.mocked(getFamilyMock).mockRejectedValue(new ApiError(404, "Not in a family"));
     vi.mocked(joinFamilyMock).mockRejectedValue(
@@ -181,6 +247,8 @@ describe("FamilyPage", () => {
     await user.type(pinInput, "ABC123");
     await user.click(screen.getByRole("button", { name: /join family/i }));
 
-    expect(await screen.findByText(/upgrade to sizepass/i)).toBeInTheDocument();
+    expect(await screen.findByText(/family is full/i)).toBeInTheDocument();
+    expect(screen.getByText(/upgrade to sizepass/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /upgrade/i })).toBeInTheDocument();
   });
 });

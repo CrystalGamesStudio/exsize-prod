@@ -24,6 +24,8 @@ export default function FamilyPage({ user }: FamilyPageProps) {
     useState<FamilyCreateResponse | null>(null);
   const [pin, setPin] = useState("");
   const [joinError, setJoinError] = useState("");
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const {
     data: family,
@@ -49,7 +51,9 @@ export default function FamilyPage({ user }: FamilyPageProps) {
       queryClient.invalidateQueries({ queryKey: ["family"] });
     },
     onError: (err) => {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status === 403) {
+        setShowUpgrade(true);
+      } else if (err instanceof ApiError) {
         setJoinError(err.message);
       } else {
         setJoinError("Failed to join family");
@@ -69,6 +73,25 @@ export default function FamilyPage({ user }: FamilyPageProps) {
   const hasNoFamily = error instanceof ApiError && error.status === 404;
 
   if (hasNoFamily && user.role === "child") {
+    if (showUpgrade) {
+      return (
+        <div className="flex justify-center pt-12">
+          <Card className="w-full max-w-md border-amber-200 bg-amber-50">
+            <CardHeader>
+              <CardTitle>Family is Full</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-muted-foreground">
+                This family has reached the free tier limit. Ask your parent to
+                upgrade to SizePass to add more members.
+              </p>
+              <Button variant="default">Upgrade</Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
     return (
       <div className="flex justify-center pt-12">
         <Card className="w-full max-w-md">
@@ -165,9 +188,13 @@ export default function FamilyPage({ user }: FamilyPageProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigator.clipboard.writeText(family.pin)}
+                onClick={() => {
+                  navigator.clipboard.writeText(family.pin);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
               >
-                Copy
+                {copied ? "Copied!" : "Copy"}
               </Button>
             </div>
             <div>
