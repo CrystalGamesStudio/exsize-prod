@@ -108,3 +108,58 @@ export function removeFamilyMember(userId: number) {
     method: "DELETE",
   });
 }
+
+// --- Tasks ---
+
+export interface TaskResponse {
+  id: number;
+  name: string;
+  description: string;
+  exbucks: number;
+  status: "assigned" | "accepted" | "completed" | "approved" | "rejected";
+  assigned_to: number;
+  day_of_week: string | null;
+  photo_url: string | null;
+}
+
+export interface TaskCreateRequest {
+  name: string;
+  description: string;
+  exbucks: number;
+  assigned_to: number;
+}
+
+export function getTasks() {
+  return apiFetch<TaskResponse[]>("/api/tasks");
+}
+
+export function createTask(data: TaskCreateRequest) {
+  return apiFetch<TaskResponse>("/api/tasks", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function approveTask(taskId: number) {
+  return apiFetch<TaskResponse>(`/api/tasks/${taskId}/approve`, {
+    method: "PATCH",
+  });
+}
+
+export function rejectTask(taskId: number) {
+  return apiFetch<TaskResponse>(`/api/tasks/${taskId}/reject`, {
+    method: "PATCH",
+  });
+}
+
+export function acceptTask(taskId: number) {
+  return apiFetch<TaskResponse>(`/api/tasks/${taskId}/accept`, {
+    method: "PATCH",
+  });
+}
+
+export function completeTask(taskId: number) {
+  return apiFetch<TaskResponse>(`/api/tasks/${taskId}/complete`, {
+    method: "PATCH",
+  });
+}

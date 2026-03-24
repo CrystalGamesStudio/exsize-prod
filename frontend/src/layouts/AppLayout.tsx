@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { UserResponse } from "@/api";
 import { useAuth } from "@/auth";
@@ -32,8 +33,32 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
+function useDarkMode() {
+  const [dark, setDark] = useState(() => {
+    try {
+      const stored = localStorage.getItem("theme");
+      if (stored) return stored === "dark";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    try {
+      localStorage.setItem("theme", dark ? "dark" : "light");
+    } catch {
+      // localStorage unavailable in test env
+    }
+  }, [dark]);
+
+  return [dark, () => setDark((d) => !d)] as const;
+}
+
 export default function AppLayout({ user, children }: AppLayoutProps) {
   const { logout } = useAuth();
+  const [dark, toggleDark] = useDarkMode();
   const navItems = NAV_ITEMS[user.role] ?? NAV_ITEMS.parent;
 
   return (
@@ -51,9 +76,19 @@ export default function AppLayout({ user, children }: AppLayoutProps) {
               </Link>
             ))}
           </nav>
-          <Button variant="ghost" size="sm" onClick={logout}>
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleDark}
+              aria-label="Toggle dark mode"
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={logout}>
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
