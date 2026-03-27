@@ -11,6 +11,8 @@ import {
   approveTask,
   rejectTask,
   completeTask,
+  editTask,
+  deleteTask,
   getFamily,
   type UserResponse,
   type TaskResponse,
@@ -39,12 +41,29 @@ function StatusBadge({ status }: { status: TaskResponse["status"] }) {
   );
 }
 
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
 export default function TasksPage({ user }: TasksPageProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [exbucks, setExbucks] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
+  const [dayOfWeek, setDayOfWeek] = useState("");
+
+  // Edit state
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editExbucks, setEditExbucks] = useState("");
+  const [editAssignedTo, setEditAssignedTo] = useState("");
+  const [editDayOfWeek, setEditDayOfWeek] = useState("");
+
+  // Delete confirmation state
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  // Photo URL state (per-task, keyed by task id)
+  const [photoUrls, setPhotoUrls] = useState<Record<number, string>>({});
 
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["tasks"],
@@ -67,6 +86,7 @@ export default function TasksPage({ user }: TasksPageProps) {
       setDescription("");
       setExbucks("");
       setAssignedTo("");
+      setDayOfWeek("");
     },
   });
 
@@ -95,11 +115,37 @@ export default function TasksPage({ user }: TasksPageProps) {
   });
 
   const completeMutation = useMutation({
-    mutationFn: completeTask,
+    mutationFn: ({ id, photoUrl }: { id: number; photoUrl?: string }) => completeTask(id, photoUrl),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
   });
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, ...data }: { id: number; name: string; description: string; exbucks: number; assigned_to: number; day_of_week: string | null }) =>
+      editTask(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setEditingId(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setDeletingId(null);
+    },
+  });
+
+  function startEditing(task: TaskResponse) {
+    setEditingId(task.id);
+    setEditName(task.name);
+    setEditDescription(task.description);
+    setEditExbucks(String(task.exbucks));
+    setEditAssignedTo(String(task.assigned_to));
+    setEditDayOfWeek(task.day_of_week ?? "");
+  }
 
   if (isLoading) return <div>Loading...</div>;
 
@@ -124,6 +170,7 @@ export default function TasksPage({ user }: TasksPageProps) {
                   description,
                   exbucks: Number(exbucks),
                   assigned_to: Number(assignedTo),
+                  day_of_week: dayOfWeek || null,
                 });
               }}
             >
@@ -168,67 +215,177 @@ export default function TasksPage({ user }: TasksPageProps) {
                   ))}
                 </select>
               </div>
+              <div>
+                <Label htmlFor="task-day">Day of Week</Label>
+                <select
+                  id="task-day"
+                  className="w-full rounded border p-2"
+                  value={dayOfWeek}
+                  onChange={(e) => setDayOfWeek(e.target.value)}
+                >
+                  <option value="">Any day</option>
+                  {DAYS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
               <Button type="submit">Create Task</Button>
             </form>
           </CardContent>
         </Card>
       )}
 
-      <div className="space-y-2">
-        {tasks?.map((task) => (
-          <div
-            key={task.id}
-            className="flex items-center justify-between rounded border p-3"
+      {user.role === "child" ? (
+        <ChildWeeklyView tasks={tasks ?? []} renderTask={renderTaskItem} />
+      ) : (
+        <div className="space-y-2">
+          {tasks?.map(renderTaskItem)}
+        </div>
+      )}
+    </div>
+  );
+
+  function renderTaskItem(task: TaskResponse) {
+    return (
+      <div key={task.id} className="rounded border p-3">
+        {editingId === task.id ? (
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              editMutation.mutate({
+                id: task.id,
+                name: editName,
+                description: editDescription,
+                exbucks: Number(editExbucks),
+                assigned_to: Number(editAssignedTo),
+                day_of_week: editDayOfWeek || null,
+              });
+            }}
           >
+            <div>
+              <Label htmlFor="edit-name">Edit Name</Label>
+              <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="edit-description">Edit Description</Label>
+              <Input id="edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="edit-exbucks">Edit ExBucks</Label>
+              <Input id="edit-exbucks" type="number" value={editExbucks} onChange={(e) => setEditExbucks(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="edit-assign">Edit Assign to</Label>
+              <select id="edit-assign" className="w-full rounded border p-2" value={editAssignedTo} onChange={(e) => setEditAssignedTo(e.target.value)}>
+                <option value="">Select child</option>
+                {children.map((child) => (
+                  <option key={child.id} value={child.id}>{child.email}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="edit-day">Edit Day</Label>
+              <select id="edit-day" className="w-full rounded border p-2" value={editDayOfWeek} onChange={(e) => setEditDayOfWeek(e.target.value)}>
+                <option value="">Any day</option>
+                {DAYS.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm">Save</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">{task.name}</span>
                 <StatusBadge status={task.status} />
+                {user.role === "parent" && task.day_of_week && (
+                  <span className="text-xs text-muted-foreground">{task.day_of_week}</span>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">
                 {task.description}
                 {task.description && " · "}
                 {task.exbucks} ExBucks
               </p>
+              {task.photo_url && (
+                <p className="text-xs text-blue-600">
+                  <a href={task.photo_url} target="_blank" rel="noopener noreferrer">{task.photo_url}</a>
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
+              {user.role === "parent" && !["completed", "approved"].includes(task.status) && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => startEditing(task)}>Edit</Button>
+                  <Button size="sm" variant="destructive" onClick={() => setDeletingId(task.id)}>Delete</Button>
+                </>
+              )}
               {user.role === "parent" && task.status === "completed" && (
                 <>
-                  <Button
-                    size="sm"
-                    onClick={() => approveMutation.mutate(task.id)}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => rejectMutation.mutate(task.id)}
-                  >
-                    Reject
-                  </Button>
+                  <Button size="sm" onClick={() => approveMutation.mutate(task.id)}>Approve</Button>
+                  <Button variant="destructive" size="sm" onClick={() => rejectMutation.mutate(task.id)}>Reject</Button>
                 </>
               )}
               {user.role === "child" && task.status === "assigned" && (
-                <Button
-                  size="sm"
-                  onClick={() => acceptMutation.mutate(task.id)}
-                >
-                  Accept
-                </Button>
+                <>
+                  <Button size="sm" onClick={() => acceptMutation.mutate(task.id)}>Accept</Button>
+                  <Button size="sm" variant="outline" onClick={() => rejectMutation.mutate(task.id)}>Reject</Button>
+                </>
               )}
               {user.role === "child" && task.status === "accepted" && (
-                <Button
-                  size="sm"
-                  onClick={() => completeMutation.mutate(task.id)}
-                >
-                  Complete
-                </Button>
+                <>
+                  <Input
+                    placeholder="Photo URL (optional)"
+                    className="w-48"
+                    value={photoUrls[task.id] ?? ""}
+                    onChange={(e) => setPhotoUrls((prev) => ({ ...prev, [task.id]: e.target.value }))}
+                  />
+                  <Button size="sm" onClick={() => completeMutation.mutate({ id: task.id, photoUrl: photoUrls[task.id] || undefined })}>Complete</Button>
+                </>
               )}
             </div>
           </div>
-        ))}
+        )}
+
+        {deletingId === task.id && (
+          <div className="mt-2 rounded border border-red-200 bg-red-50 p-3">
+            <p className="text-sm">Are you sure you want to delete this task?</p>
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(task.id)}>Confirm</Button>
+              <Button size="sm" variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+            </div>
+          </div>
+        )}
       </div>
+    );
+  }
+}
+
+function ChildWeeklyView({ tasks, renderTask }: { tasks: TaskResponse[]; renderTask: (task: TaskResponse) => React.ReactNode }) {
+  const grouped = new Map<string, TaskResponse[]>();
+  for (const day of DAYS) {
+    const dayTasks = tasks.filter((t) => t.day_of_week === day);
+    if (dayTasks.length > 0) grouped.set(day, dayTasks);
+  }
+  const unscheduled = tasks.filter((t) => !t.day_of_week);
+  if (unscheduled.length > 0) grouped.set("Unscheduled", unscheduled);
+
+  return (
+    <div className="space-y-4">
+      {Array.from(grouped.entries()).map(([day, dayTasks]) => (
+        <div key={day}>
+          <h3 className="mb-2 text-lg font-semibold">{day}</h3>
+          <div className="space-y-2">
+            {dayTasks.map(renderTask)}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

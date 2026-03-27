@@ -127,6 +127,15 @@ export interface TaskCreateRequest {
   description: string;
   exbucks: number;
   assigned_to: number;
+  day_of_week?: string | null;
+}
+
+export interface TaskEditRequest {
+  name: string;
+  description: string;
+  exbucks: number;
+  assigned_to: number;
+  day_of_week?: string | null;
 }
 
 export function getTasks() {
@@ -158,9 +167,23 @@ export function acceptTask(taskId: number) {
   });
 }
 
-export function completeTask(taskId: number) {
+export function completeTask(taskId: number, photoUrl?: string) {
   return apiFetch<TaskResponse>(`/api/tasks/${taskId}/complete`, {
     method: "PATCH",
+    body: JSON.stringify({ photo_url: photoUrl ?? null }),
+  });
+}
+
+export function editTask(taskId: number, data: TaskEditRequest) {
+  return apiFetch<TaskResponse>(`/api/tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteTask(taskId: number) {
+  return apiFetch<void>(`/api/tasks/${taskId}`, {
+    method: "DELETE",
   });
 }
 
