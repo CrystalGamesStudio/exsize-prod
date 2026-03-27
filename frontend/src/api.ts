@@ -204,3 +204,69 @@ export function assignPenalty(data: PenaltyRequest) {
     body: JSON.stringify(data),
   });
 }
+
+// --- Rewards ---
+
+export interface RewardResponse {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+}
+
+export interface RewardCreateRequest {
+  name: string;
+  description: string;
+  price: number;
+}
+
+export interface RewardUpdateRequest {
+  name?: string;
+  description?: string;
+  price?: number;
+}
+
+export interface PurchaseResponse {
+  id: number;
+  reward_name: string;
+  price: number;
+  created_at: string;
+}
+
+export function getRewards() {
+  return apiFetch<RewardResponse[]>("/api/rewards");
+}
+
+export function createReward(data: RewardCreateRequest) {
+  return apiFetch<RewardResponse>("/api/rewards", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateReward(rewardId: number, data: RewardUpdateRequest) {
+  return apiFetch<RewardResponse>(`/api/rewards/${rewardId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export function deleteReward(rewardId: number) {
+  return apiFetch<void>(`/api/rewards/${rewardId}`, {
+    method: "DELETE",
+  });
+}
+
+export function purchaseReward(rewardId: number) {
+  return apiFetch<PurchaseResponse>(`/api/rewards/${rewardId}/purchase`, {
+    method: "POST",
+  });
+}
+
+export function getPurchases() {
+  return apiFetch<PurchaseResponse[]>("/api/rewards/purchases");
+}
+
+export function getChildPurchases(childId: number) {
+  return apiFetch<PurchaseResponse[]>(`/api/rewards/purchases/${childId}`);
+}

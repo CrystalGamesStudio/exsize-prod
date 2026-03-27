@@ -7,6 +7,8 @@ import RegisterPage from "@/pages/RegisterPage";
 import FamilyPage from "@/pages/FamilyPage";
 import TasksPage from "@/pages/TasksPage";
 import ExBucksPage from "@/pages/ExBucksPage";
+import RewardsPage from "@/pages/RewardsPage";
+import ShopPage from "@/pages/ShopPage";
 
 const queryClient = new QueryClient();
 
@@ -27,9 +29,9 @@ function AuthenticatedRoutes() {
         <Route path="/tasks" element={<TasksPage user={user} />} />
         <Route path="/family" element={<FamilyPage user={user} />} />
         <Route path="/exbucks" element={<ExBucksPage user={user} />} />
-        <Route path="/shop" element={<div>Shop</div>} />
+        <Route path="/shop" element={<ShopPage user={user} />} />
         <Route path="/profile" element={<div>Profile</div>} />
-        <Route path="/rewards" element={<div>Rewards</div>} />
+        <Route path="/rewards" element={<RewardsPage user={user} />} />
         <Route path="/settings" element={<div>Settings</div>} />
         <Route
           path="*"
