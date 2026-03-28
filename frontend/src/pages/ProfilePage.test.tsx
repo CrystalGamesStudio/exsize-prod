@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AuthProvider } from "@/auth";
@@ -9,23 +9,30 @@ vi.mock("@/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api")>();
   return {
     ...actual,
-    getGamificationProfile: vi.fn(),
+    getProfile: vi.fn(),
+    getChildProfile: vi.fn(),
   };
 });
 
-import { getGamificationProfile as getProfileMock } from "@/api";
-import type { UserResponse } from "@/api";
+import { getProfile as getProfileMock, getChildProfile as getChildProfileMock } from "@/api";
+import type { UserResponse, ProfileResponse } from "@/api";
 
-const MOCK_PROFILE = {
+const MOCK_PROFILE: ProfileResponse = {
   xp: 450,
   level: 3,
   level_name: "Rookie",
   progress_percent: 50,
   xp_for_next_level: 300,
   streak: 5,
+  exbucks_balance: 120,
+  badges: ["Freemium"],
+  transactions: [
+    { id: 1, type: "earned", amount: 50, description: "Completed: Push-ups", created_at: "2026-03-27T10:00:00Z" },
+    { id: 2, type: "spent", amount: -30, description: "Purchased: Extra screen time", created_at: "2026-03-26T15:00:00Z" },
+  ],
 };
 
-function renderProfilePage(role: "child" | "parent" = "child") {
+function renderProfilePage(role: "child" | "parent" = "child", childId?: number) {
   const user: UserResponse = {
     id: role === "child" ? 2 : 1,
     email: `${role}@test.com`,
@@ -35,11 +42,15 @@ function renderProfilePage(role: "child" | "parent" = "child") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  const path = childId ? `/profile/${childId}` : "/profile";
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter>
-          <ProfilePage user={user} />
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/profile/:childId" element={<ProfilePage user={user} />} />
+            <Route path="/profile" element={<ProfilePage user={user} />} />
+          </Routes>
         </MemoryRouter>
       </AuthProvider>
     </QueryClientProvider>,
@@ -97,59 +108,124 @@ describe("ProfilePage", () => {
     expect(await screen.findByText(/1 day streak/i)).toBeInTheDocument();
   });
 
-  it("shows earned Freemium badge and locked badges", async () => {
+  it("displays earned badges from API", async () => {
+    vi.mocked(getProfileMock).mockResolvedValue({
+      ...MOCK_PROFILE,
+      badges: ["Freemium", "Rising Star"],
+    });
+
+    renderProfilePage("child");
+
+    expect(await screen.findByText("Freemium")).toBeInTheDocument();
+    expect(screen.getByText("Rising Star")).toBeInTheDocument();
+  });
+
+  it("shows only badges returned by the API", async () => {
+    vi.mocked(getProfileMock).mockResolvedValue({
+      ...MOCK_PROFILE,
+      badges: ["SizePass"],
+    });
+
+    renderProfilePage("child");
+
+    expect(await screen.findByText("SizePass")).toBeInTheDocument();
+    expect(screen.queryByText("Freemium")).not.toBeInTheDocument();
+  });
+
+  it("displays transaction history with type, amount, description, and date", async () => {
     vi.mocked(getProfileMock).mockResolvedValue(MOCK_PROFILE);
 
     renderProfilePage("child");
 
-    const freemium = await screen.findByText("Freemium");
-    expect(freemium).toBeInTheDocument();
-    // Freemium badge should not be marked as locked
-    expect(freemium.closest("[data-badge]")).not.toHaveAttribute("data-locked");
+    // First transaction
+    expect(await screen.findByText("Completed: Push-ups")).toBeInTheDocument();
+    expect(screen.getByText("+50")).toBeInTheDocument();
+    expect(screen.getByText("earned")).toBeInTheDocument();
 
-    // At least one locked badge should exist
-    const lockedBadges = document.querySelectorAll("[data-locked]");
-    expect(lockedBadges.length).toBeGreaterThan(0);
+    // Second transaction
+    expect(screen.getByText("Purchased: Extra screen time")).toBeInTheDocument();
+    expect(screen.getByText("-30")).toBeInTheDocument();
+    expect(screen.getByText("spent")).toBeInTheDocument();
   });
 
-  it("E2E: task approval updates gamification profile with new XP and level", async () => {
-    // Step 1: Child sees initial profile
+  it("shows empty state when no transactions", async () => {
     vi.mocked(getProfileMock).mockResolvedValue({
-      xp: 90,
-      level: 1,
-      level_name: "Beginner",
-      progress_percent: 90,
-      xp_for_next_level: 100,
-      streak: 0,
-    });
-
-    const { unmount } = renderProfilePage("child");
-
-    expect(await screen.findByText("Level 1")).toBeInTheDocument();
-    expect(screen.getByText(/beginner/i)).toBeInTheDocument();
-    expect(screen.getByText(/90 xp/i)).toBeInTheDocument();
-    const progressBar = screen.getByRole("progressbar");
-    expect(progressBar).toHaveAttribute("aria-valuenow", "90");
-
-    unmount();
-
-    // Step 2: After task approval, profile reflects updated XP and level
-    vi.mocked(getProfileMock).mockResolvedValue({
-      xp: 140,
-      level: 2,
-      level_name: "Starter",
-      progress_percent: 20,
-      xp_for_next_level: 200,
-      streak: 1,
+      ...MOCK_PROFILE,
+      transactions: [],
     });
 
     renderProfilePage("child");
 
+    expect(await screen.findByText(/no transactions/i)).toBeInTheDocument();
+  });
+
+  it("parent can view child's profile via /profile/:childId", async () => {
+    vi.mocked(getChildProfileMock).mockResolvedValue(MOCK_PROFILE);
+
+    renderProfilePage("parent", 2);
+
+    expect(await screen.findByText(/level 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/rookie/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 day streak/i)).toBeInTheDocument();
+    expect(screen.getByText("Freemium")).toBeInTheDocument();
+    expect(screen.getByText("Completed: Push-ups")).toBeInTheDocument();
+    expect(getChildProfileMock).toHaveBeenCalledWith(2);
+  });
+
+  it("parent without childId sees message to select a child", async () => {
+    renderProfilePage("parent");
+
+    expect(await screen.findByText(/select a child/i)).toBeInTheDocument();
+  });
+
+  it("E2E: child views own profile → parent views child's profile → data matches", async () => {
+    const sharedProfile: ProfileResponse = {
+      xp: 200,
+      level: 2,
+      level_name: "Starter",
+      progress_percent: 40,
+      xp_for_next_level: 200,
+      streak: 3,
+      exbucks_balance: 75,
+      badges: ["Freemium", "First Task"],
+      transactions: [
+        { id: 10, type: "earned", amount: 25, description: "Completed: Squats", created_at: "2026-03-28T08:00:00Z" },
+      ],
+    };
+
+    // Step 1: Child views their own profile
+    vi.mocked(getProfileMock).mockResolvedValue(sharedProfile);
+
+    const { unmount } = renderProfilePage("child");
+
     expect(await screen.findByText(/level 2/i)).toBeInTheDocument();
     expect(screen.getByText(/starter/i)).toBeInTheDocument();
-    expect(screen.getByText(/140 xp/i)).toBeInTheDocument();
-    const updatedBar = screen.getByRole("progressbar");
-    expect(updatedBar).toHaveAttribute("aria-valuenow", "20");
-    expect(screen.getByText(/1 day streak/i)).toBeInTheDocument();
+    expect(screen.getByText(/200 xp/i)).toBeInTheDocument();
+    const childBar = screen.getByRole("progressbar");
+    expect(childBar).toHaveAttribute("aria-valuenow", "40");
+    expect(screen.getByText(/3 day streak/i)).toBeInTheDocument();
+    expect(screen.getByText("Freemium")).toBeInTheDocument();
+    expect(screen.getByText("First Task")).toBeInTheDocument();
+    expect(screen.getByText("Completed: Squats")).toBeInTheDocument();
+    expect(screen.getByText("+25")).toBeInTheDocument();
+
+    unmount();
+
+    // Step 2: Parent views same child's profile — sees identical data
+    vi.mocked(getChildProfileMock).mockResolvedValue(sharedProfile);
+
+    renderProfilePage("parent", 2);
+
+    expect(await screen.findByText(/level 2/i)).toBeInTheDocument();
+    expect(screen.getByText(/starter/i)).toBeInTheDocument();
+    expect(screen.getByText(/200 xp/i)).toBeInTheDocument();
+    const parentBar = screen.getByRole("progressbar");
+    expect(parentBar).toHaveAttribute("aria-valuenow", "40");
+    expect(screen.getByText(/3 day streak/i)).toBeInTheDocument();
+    expect(screen.getByText("Freemium")).toBeInTheDocument();
+    expect(screen.getByText("First Task")).toBeInTheDocument();
+    expect(screen.getByText("Completed: Squats")).toBeInTheDocument();
+    expect(screen.getByText("+25")).toBeInTheDocument();
+    expect(getChildProfileMock).toHaveBeenCalledWith(2);
   });
 });

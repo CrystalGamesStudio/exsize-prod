@@ -32,6 +32,7 @@ function AuthenticatedRoutes() {
         <Route path="/exbucks" element={<ExBucksPage user={user} />} />
         <Route path="/shop" element={<ShopPage user={user} />} />
         <Route path="/profile" element={<ProfilePage user={user} />} />
+        <Route path="/profile/:childId" element={<ProfilePage user={user} />} />
         <Route path="/rewards" element={<RewardsPage user={user} />} />
         <Route path="/settings" element={<div>Settings</div>} />
         <Route

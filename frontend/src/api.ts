@@ -308,3 +308,33 @@ export interface GamificationProfileResponse {
 export function getGamificationProfile() {
   return apiFetch<GamificationProfileResponse>("/api/gamification/profile");
 }
+
+// --- Profile ---
+
+export interface ProfileTransactionItem {
+  id: number;
+  type: string;
+  amount: number;
+  description: string;
+  created_at: string;
+}
+
+export interface ProfileResponse {
+  xp: number;
+  level: number;
+  level_name: string;
+  progress_percent: number;
+  xp_for_next_level: number;
+  streak: number;
+  exbucks_balance: number;
+  badges: string[];
+  transactions: ProfileTransactionItem[];
+}
+
+export function getProfile() {
+  return apiFetch<ProfileResponse>("/api/profile");
+}
+
+export function getChildProfile(childId: number) {
+  return apiFetch<ProfileResponse>(`/api/profile/${childId}`);
+}
