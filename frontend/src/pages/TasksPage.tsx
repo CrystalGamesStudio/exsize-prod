@@ -97,6 +97,7 @@ export default function TasksPage({ user }: TasksPageProps) {
       queryClient.invalidateQueries({ queryKey: ["exbucks-balance"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["child-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 
@@ -104,6 +105,7 @@ export default function TasksPage({ user }: TasksPageProps) {
     mutationFn: rejectTask,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 

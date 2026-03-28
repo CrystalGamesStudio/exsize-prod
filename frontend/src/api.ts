@@ -338,3 +338,46 @@ export function getProfile() {
 export function getChildProfile(childId: number) {
   return apiFetch<ProfileResponse>(`/api/profile/${childId}`);
 }
+
+// --- Dashboard ---
+
+export interface DashboardChildStats {
+  id: number;
+  email: string;
+  tasks_completed_percent: number;
+  streak: number;
+  exbucks_earned: number;
+  exbucks_spent: number;
+}
+
+export interface DashboardDayChild {
+  child_id: number;
+  email: string;
+  total: number;
+  approved: number;
+}
+
+export interface DashboardAdvancedChildStats {
+  id: number;
+  email: string;
+  total_tasks: number;
+  approved_tasks: number;
+  xp: number;
+  level: number;
+}
+
+export interface DashboardAdvancedStats {
+  total_xp_earned: number;
+  best_streak: number;
+  children: DashboardAdvancedChildStats[];
+}
+
+export interface DashboardResponse {
+  children: DashboardChildStats[];
+  weekly_overview: Record<string, DashboardDayChild[]>;
+  advanced_stats: DashboardAdvancedStats | null;
+}
+
+export function getDashboard() {
+  return apiFetch<DashboardResponse>("/api/dashboard");
+}

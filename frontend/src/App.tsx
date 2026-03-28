@@ -10,6 +10,7 @@ import ExBucksPage from "@/pages/ExBucksPage";
 import RewardsPage from "@/pages/RewardsPage";
 import ShopPage from "@/pages/ShopPage";
 import ProfilePage from "@/pages/ProfilePage";
+import DashboardPage from "@/pages/DashboardPage";
 
 const queryClient = new QueryClient();
 
@@ -26,7 +27,7 @@ function AuthenticatedRoutes() {
   return (
     <AppLayout user={user}>
       <Routes>
-        <Route path="/dashboard" element={<div>Dashboard</div>} />
+        <Route path="/dashboard" element={<DashboardPage user={user} />} />
         <Route path="/tasks" element={<TasksPage user={user} />} />
         <Route path="/family" element={<FamilyPage user={user} />} />
         <Route path="/exbucks" element={<ExBucksPage user={user} />} />
