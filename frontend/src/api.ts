@@ -293,3 +293,18 @@ export function getPurchases() {
 export function getChildPurchases(childId: number) {
   return apiFetch<PurchaseResponse[]>(`/api/rewards/purchases/${childId}`);
 }
+
+// --- Gamification ---
+
+export interface GamificationProfileResponse {
+  xp: number;
+  level: number;
+  level_name: string;
+  progress_percent: number;
+  xp_for_next_level: number;
+  streak: number;
+}
+
+export function getGamificationProfile() {
+  return apiFetch<GamificationProfileResponse>("/api/gamification/profile");
+}

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getBalance, type UserResponse } from "@/api";
+import { getBalance, getGamificationProfile, type UserResponse } from "@/api";
 import { useAuth } from "@/auth";
 
 const NAV_ITEMS: Record<string, { label: string; to: string }[]> = {
@@ -72,6 +72,13 @@ export default function AppLayout({ user, children }: AppLayoutProps) {
     enabled: user.role === "child",
   });
 
+  const { data: profileData } = useQuery({
+    queryKey: ["gamification-profile"],
+    queryFn: getGamificationProfile,
+    retry: false,
+    enabled: user.role === "child",
+  });
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b bg-background">
@@ -88,10 +95,35 @@ export default function AppLayout({ user, children }: AppLayoutProps) {
             ))}
           </nav>
           <div className="flex items-center gap-2">
+            {user.role === "child" && profileData != null && (
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 rounded-full border-2 border-primary bg-primary/10 px-4 py-1.5 font-bold text-primary transition-colors hover:bg-primary/20"
+                aria-label="Streak"
+              >
+                <span className="text-2xl">🔥</span>
+                <span className="text-lg">{profileData.streak}</span>
+              </Link>
+            )}
+            {user.role === "child" && profileData != null && (
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 rounded-full border-2 border-primary bg-primary/10 px-4 py-1.5 font-bold text-primary transition-colors hover:bg-primary/20"
+                aria-label="Level"
+              >
+                <span className="text-2xl">⭐</span>
+                <span className="text-lg">{profileData.level}</span>
+              </Link>
+            )}
             {user.role === "child" && balanceData != null && (
-              <span className="text-sm font-semibold">
-                {balanceData.balance} ExBucks
-              </span>
+              <Link
+                to="/exbucks"
+                className="flex items-center gap-2 rounded-full border-2 border-primary bg-primary/10 px-4 py-1.5 font-bold text-primary transition-colors hover:bg-primary/20"
+                aria-label="ExBucks balance"
+              >
+                <span className="text-2xl">💰</span>
+                <span className="text-lg">{balanceData.balance}</span>
+              </Link>
             )}
             <Button
               variant="ghost"
