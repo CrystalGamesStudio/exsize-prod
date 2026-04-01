@@ -430,6 +430,27 @@ export function getLeaderboard() {
   return apiFetch<LeaderboardResponse>("/api/leaderboard");
 }
 
+export interface GlobalLeaderboardEntry {
+  id: number;
+  email: string;
+  nickname: string | null;
+  avatar_icon: string | null;
+  avatar_background: string | null;
+  xp: number;
+  level: number;
+  streak: number;
+  position: number;
+}
+
+export interface GlobalLeaderboardResponse {
+  entries: GlobalLeaderboardEntry[];
+  user_entry: GlobalLeaderboardEntry | null;
+}
+
+export function getGlobalLeaderboard() {
+  return apiFetch<GlobalLeaderboardResponse>("/api/leaderboard/global");
+}
+
 // --- Admin Settings ---
 
 export interface AppSettingsResponse {
