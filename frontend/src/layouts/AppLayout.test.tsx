@@ -87,10 +87,13 @@ describe("AppLayout", () => {
       role: "parent",
       language: "en",
     });
-    expect(screen.getByText(/dashboard/i)).toBeInTheDocument();
-    expect(screen.getByText(/tasks/i)).toBeInTheDocument();
-    expect(screen.getByText(/family/i)).toBeInTheDocument();
-    expect(screen.getByText(/settings/i)).toBeInTheDocument();
+    // Mobile: bottom tab bar + top bar
+    expect(screen.getByLabelText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByLabelText("Add task")).toBeInTheDocument();
+    expect(screen.getByLabelText("ExBucks")).toBeInTheDocument();
+    expect(screen.getByLabelText("Settings")).toBeInTheDocument();
+    expect(screen.getByLabelText("Family")).toBeInTheDocument();
+    // Not visible for parent
     expect(screen.queryByText(/shop/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/profile/i)).not.toBeInTheDocument();
   });
@@ -193,5 +196,26 @@ describe("AppLayout", () => {
     });
     await user.click(screen.getByRole("button", { name: /logout/i }));
     expect(setTokenMock).toHaveBeenCalledWith(null);
+  });
+
+  it("parent sees bottom tab bar and top bar", () => {
+    renderLayoutWithUser({
+      id: 1,
+      email: "parent@test.com",
+      role: "parent",
+      language: "en",
+    });
+    expect(screen.getByLabelText("Add task")).toBeInTheDocument();
+    expect(screen.getByLabelText("Settings")).toBeInTheDocument();
+  });
+
+  it("child does not see parent bottom tab bar", () => {
+    renderLayoutWithUser({
+      id: 2,
+      email: "child@test.com",
+      role: "child",
+      language: "en",
+    });
+    expect(screen.queryByLabelText("Add task")).not.toBeInTheDocument();
   });
 });

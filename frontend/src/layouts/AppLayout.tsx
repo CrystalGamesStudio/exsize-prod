@@ -5,6 +5,8 @@ import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getBalance, getGamificationProfile, type UserResponse } from "@/api";
 import { useAuth } from "@/auth";
+import ParentBottomTabBar from "@/components/ParentBottomTabBar";
+import ParentTopBar from "@/components/ParentTopBar";
 
 const SIZEPASS_COLORS = [
   "#ff6b6b", // S - red
@@ -117,7 +119,8 @@ export default function AppLayout({ user, children }: AppLayoutProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b bg-background">
+      {user.role === "parent" && <ParentTopBar />}
+      <header className="border-b bg-background md:block hidden">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <nav className="flex gap-4">
             {navItems.map((item) => (
@@ -176,9 +179,10 @@ export default function AppLayout({ user, children }: AppLayoutProps) {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-20 md:pb-6">
         {children}
       </main>
+      {user.role === "parent" && <ParentBottomTabBar />}
     </div>
   );
 }
