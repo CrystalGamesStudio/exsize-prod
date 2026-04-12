@@ -5,6 +5,7 @@ primary_region = 'fra'
 
 [env]
   DATABASE_URL = 'sqlite:////data/exsize.db'
+  CORS_ORIGINS = 'https://exsize.crstl.workers.dev'
 
 [http_service]
   internal_port = 8080
