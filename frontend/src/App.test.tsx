@@ -16,15 +16,16 @@ vi.mock("@/api", async (importOriginal) => {
 import App from "@/App";
 
 describe("Auth guard", () => {
-  it("redirects unauthenticated user to login page", () => {
+  it("shows auth modal when user is not authenticated", () => {
     render(<App />);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
-  it("redirects /dashboard to login when not authenticated", () => {
+  it("shows auth modal even when navigating to /dashboard", () => {
     window.history.pushState({}, "", "/dashboard");
     render(<App />);
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });
