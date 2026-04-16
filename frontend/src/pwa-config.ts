@@ -1,6 +1,36 @@
 import type { VitePWAOptions } from "vite-plugin-pwa"
 
 export const pwaConfig: Partial<VitePWAOptions> = {
+  registerType: "autoUpdate",
+  workbox: {
+    globPatterns: ["**/*.{html,js,css,ico,png,svg,woff2}"],
+    runtimeCaching: [
+      {
+        urlPattern: /\.(?:js|css)$/,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "static-assets",
+          expiration: { maxEntries: 50, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
+      },
+      {
+        urlPattern: /\.(?:woff2?|ttf|eot)$/,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "fonts",
+          expiration: { maxEntries: 20, maxAgeSeconds: 365 * 24 * 60 * 60 },
+        },
+      },
+      {
+        urlPattern: /\.(?:png|jpg|jpeg|gif|svg|ico|webp)$/,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "images",
+          expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
+      },
+    ],
+  },
   manifest: {
     name: "ExSize",
     short_name: "ExSize",
