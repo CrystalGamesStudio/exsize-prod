@@ -1,18 +1,21 @@
 import secrets
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from exsize.database import get_db
 from exsize.deps import get_current_user
-from exsize.models import ApiToken, User
+from exsize.models import ApiToken, CryploTransfer, User
 from exsize.security import hash_password, verify_password
 
 router = APIRouter(prefix="/api/cryplo", tags=["cryplo"])
+
+bearer_scheme = HTTPBearer()
 
 
 class TokenResponse(BaseModel):
@@ -84,3 +87,140 @@ def verify_token(body: VerifyRequest, db: Session = Depends(get_db)):
                 username=user.nickname,
             )
     return JSONResponse(status_code=401, content={"valid": False, "error": "invalid_token"})
+
+
+def _get_user_from_api_token(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User:
+    raw = credentials.credentials
+    for api_token in db.query(ApiToken).filter(ApiToken.revoked_at.is_(None)).all():
+        if verify_password(raw, api_token.token_hash):
+            user = db.query(User).filter(User.id == api_token.user_id).first()
+            if user:
+                return user
+    raise HTTPException(status_code=401, detail="Invalid API token")
+
+
+class BalanceResponse(BaseModel):
+    excoin_balance: int
+    user_id: int
+
+
+@router.get("/balance", response_model=BalanceResponse)
+def get_balance(user: User = Depends(_get_user_from_api_token)):
+    return BalanceResponse(excoin_balance=user.exbucks_balance, user_id=user.id)
+
+
+class WithdrawRequest(BaseModel):
+    amount_usd: float
+    cryplo_user_id: str
+
+
+class WithdrawResponse(BaseModel):
+    success: bool
+    excoin_amount: float
+    exsize_user_id: int
+    transfer_id: int
+    new_excoin_balance: float
+    weekly_remaining_usd: float
+
+
+WEEKLY_LIMIT_USD = 60
+
+
+@router.post("/withdraw", response_model=WithdrawResponse)
+def withdraw(
+    body: WithdrawRequest,
+    user: User = Depends(_get_user_from_api_token),
+    db: Session = Depends(get_db),
+):
+    excoin_amount = body.amount_usd / 2
+
+    from sqlalchemy import func as sa_func
+    week_start = datetime.now(timezone.utc) - timedelta(days=datetime.now(timezone.utc).weekday())
+    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    weekly_used = db.query(sa_func.coalesce(sa_func.sum(CryploTransfer.amount_usd), 0)).filter(
+        CryploTransfer.exsize_user_id == user.id,
+        CryploTransfer.type == "withdraw",
+        CryploTransfer.created_at >= week_start,
+    ).scalar()
+
+    if weekly_used + body.amount_usd > WEEKLY_LIMIT_USD:
+        return JSONResponse(status_code=429, content={
+            "success": False,
+            "error": "weekly_limit_exceeded",
+            "weekly_used_usd": weekly_used,
+            "weekly_limit_usd": WEEKLY_LIMIT_USD,
+            "remaining_usd": max(0, WEEKLY_LIMIT_USD - weekly_used),
+        })
+
+    user.exbucks_balance = int(user.exbucks_balance + excoin_amount)
+    transfer = CryploTransfer(
+        exsize_user_id=user.id,
+        type="withdraw",
+        amount_usd=body.amount_usd,
+        excoin_amount=excoin_amount,
+        status="completed",
+        completed_at=datetime.now(timezone.utc),
+    )
+    db.add(transfer)
+    db.commit()
+    db.refresh(transfer)
+    db.refresh(user)
+
+    return WithdrawResponse(
+        success=True,
+        excoin_amount=excoin_amount,
+        exsize_user_id=user.id,
+        transfer_id=transfer.id,
+        new_excoin_balance=user.exbucks_balance,
+        weekly_remaining_usd=WEEKLY_LIMIT_USD - weekly_used - body.amount_usd,
+    )
+
+
+class DepositRequest(BaseModel):
+    amount_usd: float
+    cryplo_user_id: str
+
+
+class DepositResponse(BaseModel):
+    success: bool
+    excoin_amount: float
+    exsize_user_id: int
+    transfer_id: int
+    new_excoin_balance: float
+
+
+@router.post("/deposit", response_model=DepositResponse)
+def deposit(
+    body: DepositRequest,
+    user: User = Depends(_get_user_from_api_token),
+    db: Session = Depends(get_db),
+):
+    excoin_amount = body.amount_usd / 2
+    if user.exbucks_balance < excoin_amount:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": "insufficient_funds", "current_balance": user.exbucks_balance},
+        )
+    user.exbucks_balance = int(user.exbucks_balance - excoin_amount)
+    transfer = CryploTransfer(
+        exsize_user_id=user.id,
+        type="deposit",
+        amount_usd=body.amount_usd,
+        excoin_amount=excoin_amount,
+        status="completed",
+        completed_at=datetime.now(timezone.utc),
+    )
+    db.add(transfer)
+    db.commit()
+    db.refresh(transfer)
+    db.refresh(user)
+    return DepositResponse(
+        success=True,
+        excoin_amount=excoin_amount,
+        exsize_user_id=user.id,
+        transfer_id=transfer.id,
+        new_excoin_balance=user.exbucks_balance,
+    )
