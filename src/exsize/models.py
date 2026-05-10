@@ -109,3 +109,13 @@ class Subscription(Base):
     status: Mapped[str] = mapped_column(String, nullable=False, default="active")
     current_period_end: Mapped[str | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+
+class ApiToken(Base):
+    __tablename__ = "api_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[str] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    revoked_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
